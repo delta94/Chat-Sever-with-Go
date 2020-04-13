@@ -33,6 +33,8 @@ func (w *CommandWriter) Write(command interface{}) (err error) {
 		err = w.writeString(fmt.Sprintf("NAME %s\n", v.Name))
 	case MessageCommand:
 		err = w.writeString(fmt.Sprintf("MESSAGE %s %s\n", v.Name, v.Message))
+	default:
+		err = UndefinedCommand
 	}
 
 	return
