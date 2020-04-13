@@ -1,5 +1,9 @@
 package protocol
 
+import "errors"
+
+var UndefinedCommand = errors.New("undefined command")
+
 // SendCommand는 새 메세지를 클라이언트에게 전송할 때 사용된다.
 type SendCommand struct {
 	Message string
