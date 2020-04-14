@@ -45,8 +45,12 @@ func (ts *TcpChatServer) StartServer() {
 	}
 }
 
+func (ts *TcpChatServer) CloseServer() {
+	_ = ts.listener.Close()
+}
+
 func (ts *TcpChatServer) accept(conn net.Conn) *client {
-	log.Printf("Accepting new connection from %v... (current clients: %v)", conn.RemoteAddr().String(), len(ts.clients) + 1)
+	log.Printf("Accepting new connection from %v... (current clients: %v)", conn.RemoteAddr().String(), len(ts.clients))
 
 	ts.mutex.Lock()
 	defer ts.mutex.Unlock()
@@ -57,11 +61,13 @@ func (ts *TcpChatServer) accept(conn net.Conn) *client {
 	}
 
 	ts.clients = append(ts.clients, client)
+	log.Printf("Complete accepting new connection from %v! (current clients: %v)", conn.RemoteAddr().String(), len(ts.clients) + 1)
 	return client
 }
 
 func (ts *TcpChatServer) serve(client *client) {
 	reader := protocol.NewCommandReader(client.conn)
+	defer ts.remove(client)
 
 	for {
 		v, err := reader.Read()
@@ -75,12 +81,26 @@ func (ts *TcpChatServer) serve(client *client) {
 		case protocol.NameCommand:
 			client.name = cmd.Name
 		case protocol.SendCommand:
-			ts.broadCast(protocol.MessageCommand{
+			go ts.broadCast(protocol.MessageCommand{
 				Name:    client.name,
 				Message: cmd.Message,
 			})
 		}
 	}
+}
+
+func (ts *TcpChatServer) remove(client *client) {
+	ts.mutex.Lock()
+	defer ts.mutex.Unlock()
+
+	for i, c := range ts.clients {
+		if c != client { continue }
+		ts.clients = append(ts.clients[:i], ts.clients[i+1:]...)
+		_ = client.conn.Close()
+		return
+	}
+
+	log.Println("something error... (on TcpChatServer.remove)")
 }
 
 func (ts *TcpChatServer) broadCast(v interface{}) {
