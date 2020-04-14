@@ -20,6 +20,12 @@ type client struct {
 	writer *protocol.CommandWriter		// 클라이언트 측에 명령을 보내기 위한 필드
 }
 
+func NewTcpChatServer() *TcpChatServer {
+	return &TcpChatServer{
+		mutex: &sync.Mutex{},
+	}
+}
+
 func (ts *TcpChatServer) Listen(address string) (err error) {
 	var l net.Listener
 	// net.Listen 함수를 이용하여 해당 주소에 서버를 대기시키기 위한 객체를 얻을 수 있다.
@@ -64,7 +70,7 @@ func (ts *TcpChatServer) accept(conn net.Conn) *client {
 	}
 
 	ts.clients = append(ts.clients, client)
-	log.Printf("Complete accepting new connection from %v! (current clients: %v)\n", conn.RemoteAddr().String(), len(ts.clients) + 1)
+	log.Printf("Complete accepting new connection from %v! (current clients: %v)\n", conn.RemoteAddr().String(), len(ts.clients))
 	return client
 }
 
