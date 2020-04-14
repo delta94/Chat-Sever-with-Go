@@ -50,9 +50,10 @@ func TestReadContinuousCommand(t *testing.T) {
 		results []interface{}
 	}{
 		{
-			input: "NAME Test\nSEND Test\n",
+			input: "NAME Test\nUNDEFINED Test\nSEND Test\n",
 			results: []interface{}{
 				protocol.NameCommand{Name: "Test"},
+				protocol.UndefinedCommand,
 				protocol.SendCommand{Message: "Test"},
 			},
 		},
