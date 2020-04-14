@@ -27,19 +27,21 @@ func (ts *TcpChatServer) Listen(address string) (err error) {
 		return
 	}
 
-	log.Printf("Listening on %v", address)
+	log.Printf("Listening on %v\n", address)
 	ts.listener = l
 	return
 }
 
 func (ts *TcpChatServer) StartServer() {
 	for {
+		// 클라이언트로 부터 새로운 연결 요청이 있을때까지 대기한다.
 		conn, err := ts.listener.Accept()
 		if err != nil {
 			log.Printf("Unable to Accept err: %v\n", err)
 			return
 		}
 
+		// 요청이 들어오면 해당 클라이언트와의 연결을 저장하고, 고루틴으로 비즈니스 로직(명령어)을 처리한다.
 		client := ts.accept(conn)
 		go ts.serve(client)
 	}
@@ -50,8 +52,9 @@ func (ts *TcpChatServer) CloseServer() {
 }
 
 func (ts *TcpChatServer) accept(conn net.Conn) *client {
-	log.Printf("Accepting new connection from %v... (current clients: %v)", conn.RemoteAddr().String(), len(ts.clients))
+	log.Printf("Accepting new connection from %v... (current clients: %v)\n", conn.RemoteAddr().String(), len(ts.clients))
 
+	// race condition을 막기 위한 mutex Lock & Unlock
 	ts.mutex.Lock()
 	defer ts.mutex.Unlock()
 
@@ -61,7 +64,7 @@ func (ts *TcpChatServer) accept(conn net.Conn) *client {
 	}
 
 	ts.clients = append(ts.clients, client)
-	log.Printf("Complete accepting new connection from %v! (current clients: %v)", conn.RemoteAddr().String(), len(ts.clients) + 1)
+	log.Printf("Complete accepting new connection from %v! (current clients: %v)\n", conn.RemoteAddr().String(), len(ts.clients) + 1)
 	return client
 }
 
@@ -70,11 +73,12 @@ func (ts *TcpChatServer) serve(client *client) {
 	defer ts.remove(client)
 
 	for {
+		// 위에서 선언한 Reader를 이용해 클라이언트가 보낸 명령어를 읽어들인다.
 		v, err := reader.Read()
 		if err == io.EOF {
 			break
 		} else if err != nil {
-			log.Printf("Unable to parse string command, err: %v", err)
+			log.Printf("Unable to parse string command, err: %v\n", err)
 			return
 		}
 		switch cmd := v.(type) {
@@ -90,13 +94,16 @@ func (ts *TcpChatServer) serve(client *client) {
 }
 
 func (ts *TcpChatServer) remove(client *client) {
+	// race condition을 막기 위한 mutex Lock & Unlock
 	ts.mutex.Lock()
 	defer ts.mutex.Unlock()
 
 	for i, c := range ts.clients {
 		if c != client { continue }
+		// 해당 클라이언트를 현재 연결중인 클라이언트들의 목록에서 제거한다.
 		ts.clients = append(ts.clients[:i], ts.clients[i+1:]...)
 		_ = client.conn.Close()
+		log.Printf("Closed connection from %v. (current clients: %v)\n", client.conn.RemoteAddr().String(), len(ts.clients))
 		return
 	}
 
@@ -104,6 +111,7 @@ func (ts *TcpChatServer) remove(client *client) {
 }
 
 func (ts *TcpChatServer) broadCast(v interface{}) {
+	// 서버의 목록에 있는 모든 클라이언트들에게 명령어를 보낸다.
 	for _, client := range ts.clients {
 		_ = client.writer.Write(v)
 	}
