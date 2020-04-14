@@ -59,3 +59,32 @@ func (ts *TcpChatServer) accept(conn net.Conn) *client {
 	ts.clients = append(ts.clients, client)
 	return client
 }
+
+func (ts *TcpChatServer) serve(client *client) {
+	reader := protocol.NewCommandReader(client.conn)
+
+	for {
+		v, err := reader.Read()
+		if err == io.EOF {
+			break
+		} else if err != nil {
+			log.Printf("Unable to parse string command, err: %v", err)
+			return
+		}
+		switch cmd := v.(type) {
+		case protocol.NameCommand:
+			client.name = cmd.Name
+		case protocol.SendCommand:
+			ts.broadCast(protocol.MessageCommand{
+				Name:    client.name,
+				Message: cmd.Message,
+			})
+		}
+	}
+}
+
+func (ts *TcpChatServer) broadCast(v interface{}) {
+	for _, client := range ts.clients {
+		_ = client.writer.Write(v)
+	}
+}
