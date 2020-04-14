@@ -2,6 +2,7 @@ package server
 
 import (
 	"chat.server.com/protocol"
+	"io"
 	"log"
 	"net"
 	"sync"
@@ -31,3 +32,30 @@ func (ts *TcpChatServer) Listen(address string) (err error) {
 	return
 }
 
+func (ts *TcpChatServer) StartServer() {
+	for {
+		conn, err := ts.listener.Accept()
+		if err != nil {
+			log.Printf("Unable to Accept err: %v\n", err)
+			return
+		}
+
+		client := ts.accept(conn)
+		go ts.serve(client)
+	}
+}
+
+func (ts *TcpChatServer) accept(conn net.Conn) *client {
+	log.Printf("Accepting new connection from %v... (current clients: %v)", conn.RemoteAddr().String(), len(ts.clients) + 1)
+
+	ts.mutex.Lock()
+	defer ts.mutex.Unlock()
+
+	client := &client{
+		conn:   conn,
+		writer: protocol.NewCommandWriter(conn),
+	}
+
+	ts.clients = append(ts.clients, client)
+	return client
+}
